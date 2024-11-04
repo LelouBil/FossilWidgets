@@ -4,18 +4,27 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import org.json.JSONObject
 
 interface WatchWidgetService {
     fun setWidget(context: Context, widgetNum: Int, topText: String, bottomText: String)
+    fun setWatchFace(context: Context, watchFace: String)
 }
 
 object RealWidgetService : WatchWidgetService {
     override fun setWidget(context: Context, widgetNum: Int, topText: String, bottomText: String) =
         setWidgetGadgetBridge(context, widgetNum, topText, bottomText)
+    override fun setWatchFace(context: Context, watchFace: String) {
+        setWatchFaceGadgetBridge(context, watchFace)
+    }
 }
 
 class FakeWidgetService : WatchWidgetService {
+
+    private val _watchFace = mutableStateOf("")
+    public val watchFace: String
+        get() = _watchFace.value
 
     private val _state = mutableStateListOf<WidgetContent>()
 
@@ -29,6 +38,10 @@ class FakeWidgetService : WatchWidgetService {
         Log.d("FakeWidgetService", "Setting widget $widgetNum to $topText $bottomText")
         Log.d("FakeWidgetService", "Widget count: ${_state.size}")
         _state[widgetNum] = WidgetContent(topText, bottomText)
+    }
+
+    override fun setWatchFace(context: Context, watchFace: String) {
+        _watchFace.value = watchFace
     }
 }
 
@@ -51,4 +64,15 @@ private fun setWidgetGadgetBridge(context: Context, widgetNum: Int, topText: Str
         context.sendBroadcast(it)
     }
 }
+
+const val SET_WATCHFACE_INTENT: String = "nodomain.freeyourgadget.gadgetbridge.Q_SWITCH_WATCHFACE"
+private fun setWatchFaceGadgetBridge(context: Context, watchFace: String) {
+    Log.i("SetWatchFace", "Setting watchface to $watchFace")
+    Intent(SET_WATCHFACE_INTENT).apply {
+        putExtra("WATCHFACE_NAME", watchFace)
+    }.also {
+        context.sendBroadcast(it)
+    }
+}
+
 

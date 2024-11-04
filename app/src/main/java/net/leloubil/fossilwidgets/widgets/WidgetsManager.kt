@@ -3,13 +3,29 @@ package net.leloubil.fossilwidgets.widgets
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import net.leloubil.fossilwidgets.services.WidgetService
+import net.leloubil.fossilwidgets.widgetsapi.WatchFace
+import net.leloubil.fossilwidgets.widgetsapi.WatchFaceProvider
+import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
+import net.leloubil.fossilwidgets.widgetsapi.WidgetContentProvider
+import net.leloubil.fossilwidgets.widgetsapi.makeWatchface
+
+fun WidgetComposeState.EmptyWatchFace() = makeWatchface {
+    MutableStateFlow( WatchFace(
+        "empty",
+        listOf()
+    ))
+}
+
 
 object WidgetsManager {
-    val widgets: List<Widget>
-        get() = _widgets
-    private val _widgets = mutableListOf<Widget>()
-    var widgetService: WatchWidgetService = RealWidgetService
+    lateinit var widgetService: WatchWidgetService
+    val watchface: WatchFaceProvider?
+        get() = _watchface
+    private var _watchface: WatchFaceProvider? = null
 
 
     private fun stopWidgetService(context: Context) {
@@ -22,17 +38,13 @@ object WidgetsManager {
         context.startService(Intent(context, WidgetService::class.java))
     }
 
-    fun restartWidgetService(context: Context) {
+    private fun restartWidgetService(context: Context) {
         stopWidgetService(context)
         startWidgetService(context)
     }
 
-    fun setWidgetsCount(count: Int, context: Context) {
-        if (count < 0) throw IllegalArgumentException("Count must be positive")
-        _widgets.clear()
-        for (i in 0..<count) {
-            _widgets.add(Widget(i, widgetService).apply { contentProvider = null })
-        }
+    fun setWatchface(watchface: WatchFaceProvider, context: Context) {
+        this._watchface = watchface
         restartWidgetService(context)
     }
 }

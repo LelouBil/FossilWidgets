@@ -7,12 +7,14 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import net.leloubil.fossilwidgets.widgetsapi.widgetDataProvider
 import net.leloubil.fossilwidgets.widgets.WidgetContent
+import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-
+//
 data class CalendarEvent(val title: String, val start: Instant, val end: Instant)
-fun nextCalendarEventFlow(
+
+suspend fun WidgetComposeState.nextCalendarEventFlow(
     updateTime: Duration = 10.minutes
 ) = widgetDataProvider {
     while (currentCoroutineContext().isActive) {

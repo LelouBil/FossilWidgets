@@ -26,13 +26,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import net.leloubil.fossilwidgets.composewidget.Widget0
+import net.leloubil.fossilwidgets.composewidget.BaseWatchFace
 import net.leloubil.fossilwidgets.ui.theme.FossilWidgetsTheme
 import net.leloubil.fossilwidgets.widgets.FakeWidgetService
 import net.leloubil.fossilwidgets.widgets.WatchWidgetService
 import net.leloubil.fossilwidgets.widgets.WidgetsManager
 import net.leloubil.fossilwidgets.stateproviders.NotificationListener
-import net.leloubil.fossilwidgets.widgets.complex.ScrollableTextWidgetContentProvider
+import net.leloubil.fossilwidgets.widgets.RealWidgetService
+import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,8 +84,7 @@ fun ButtonsList(modifier: Modifier = Modifier, widgetService: WatchWidgetService
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = {
                 Log.i("FossilWidgets", "Set widget count")
-                WidgetsManager.setWidgetsCount(1, context)
-                WidgetsManager.widgets.forEach { it.contentProvider = Widget0() }
+                WidgetsManager.setWatchface(WidgetComposeState::BaseWatchFace, context)
             }) {
             Text("Reset all")
         }
@@ -106,9 +106,9 @@ fun App() {
 private fun Component(innerPadding: PaddingValues) {
     Column(modifier = Modifier.padding(innerPadding)) {
         val fakeWidgetService by remember { mutableStateOf(FakeWidgetService()) }
-        var counter by remember { mutableIntStateOf(0) }
-        ButtonsList(widgetService = fakeWidgetService)
+        ButtonsList(widgetService = RealWidgetService)
         Column {
+            Text("watchface: ${fakeWidgetService.watchFace}")
             Text("Widget count: ${fakeWidgetService.state.size}")
             fakeWidgetService.state.forEachIndexed { i, widgetContent ->
                 Column {

@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
-import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeStateInWidget
+import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
 
 sealed class MediaInfoUpdate {
     data class MetadataChanged(val mediaInfo: MediaMetadata?) : MediaInfoUpdate()
@@ -118,7 +118,7 @@ fun mediaSessionStateFlow(
     )
 }
 
-suspend fun WidgetComposeStateInWidget.getMediaStateFlow(): StateFlow<MediaState> = channelFlow {
+suspend fun WidgetComposeState.getMediaStateFlow(): StateFlow<MediaState> = channelFlow {
     mediaSessionStateFlow(context, coroutineScope).collectLatest { it ->
         if (it == null) {
             send(MediaState(null, false))
