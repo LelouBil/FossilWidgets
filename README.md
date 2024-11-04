@@ -1,5 +1,9 @@
 # Fossil Hybrid Smartwatch widgets using Gadgetbridge
 
+This is an android application that uses Gadgetbridge's Intents API to change the contents of custom widgets on a Fossil Hybrid Smartwatch. It aims to be easy to use to program dynamic widgets, instead of using apps like Tasker for this (Tasker works well, I was using it. But for complex widgets it is really cumbersome to set up)
+
+Right now the widgets are "hardcoded" inside of the app. The end goal would be dynamic code loaded from other APKs, and this app would be responsible for calling them.
+
 I was using Tasker to do custom widgets, but I wanted advanced stuff like Scrolling text and switching values based on context. This quickly became unmanageable inside of tasker so I thought of having a declarative React/Compose-like api to build custom watchfaces and widgets.
 
 Currently, it's working fine. The end goal for the api is to drop all the nested lambas and have some kind of mechanism that tracks context and to be able to keep state even if the parent component re-renders (currently it's lost)
