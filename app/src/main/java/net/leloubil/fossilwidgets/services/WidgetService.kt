@@ -9,14 +9,12 @@ import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
-import net.leloubil.fossilwidgets.api.WatchFaceContext
-import net.leloubil.fossilwidgets.api.WidgetsApiContext
+import net.leloubil.fossilwidgets.api.CompositionContext
+import net.leloubil.fossilwidgets.api.WatchFace
 import net.leloubil.fossilwidgets.inputs.MenuInputReceiver
 import net.leloubil.fossilwidgets.widgets.WidgetContent
 import net.leloubil.fossilwidgets.widgets.WidgetsManager
@@ -42,7 +40,7 @@ class WidgetService : LifecycleService() {
             Log.i("FossilWidgets", "Starting service, lifecycle: ${this@watchFace}")
             try {
                 WidgetsManager.watchFaceProvider(
-                    WatchFaceContext(
+                    CompositionContext<WatchFace>(
                         this@WidgetService,
                         this@watchFace
                     )
@@ -66,7 +64,7 @@ class WidgetService : LifecycleService() {
                                     )
                                     var oldContent: WidgetContent? = null
                                     widgetContentProvider(
-                                        WidgetsApiContext(
+                                        CompositionContext<WidgetContent>(
                                             this@WidgetService,
                                             this@widget
                                         )

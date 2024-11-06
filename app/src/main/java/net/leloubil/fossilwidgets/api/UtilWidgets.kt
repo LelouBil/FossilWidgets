@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import net.leloubil.fossilwidgets.widgets.WidgetContent
@@ -15,17 +14,17 @@ import kotlin.math.min
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-fun WidgetsApiContext.Scrollable(
+fun CompositionContext<WidgetContent>.Scrollable(
     enabled: Boolean = true,
     windowSize: Int = 20,
     charsPerScroll: Int = 8,
     scrollDuration: Duration = 3.seconds,
     scrollWaitAtStart: Duration = 2.seconds,
     scrollWaitAtEnd: Duration = 3.seconds,
-    it: StringProviderCreator
+    it: ProviderCreator<String>
 ) =
     Scrollable(
-        makeStringProvider(it),
+        makeReactive<String>(it),
         enabled,
         windowSize,
         charsPerScroll,
@@ -34,56 +33,39 @@ fun WidgetsApiContext.Scrollable(
         scrollWaitAtEnd
     )
 
-//fun WidgetsApiContext.Scrollable(
-//    sourceProviderState: String,
-//    enabled: Boolean = true,
-//    windowSize: Int = 20,
-//    charsPerScroll: Int = 8,
-//    scrollDuration: Duration = 3.seconds,
-//    scrollWaitAtStart: Duration = 2.seconds,
-//    scrollWaitAtEnd: Duration = 3.seconds
-//) = Scrollable(
-//    sourceProviderState.static(),
-//    enabled,
-//    windowSize,
-//    charsPerScroll,
-//    scrollDuration,
-//    scrollWaitAtStart,
-//    scrollWaitAtEnd
-//)
-
 private fun Scrollable(
-    sourceProviderState: StringProvider,
+    sourceProviderState: Provider<String>,
     enabled: Boolean = true,
     windowSize: Int = 20,
     charsPerScroll: Int = 8,
     scrollDuration: Duration = 3.seconds,
     scrollWaitAtStart: Duration = 3.seconds,
     scrollWaitAtEnd: Duration = 3.seconds
-) = makeStringProvider {
+) = makeReactive<String>{
     Log.i("Scrollable", "Creating ScrollingText")
     val data by useState { sourceProviderState.toState() }
     if (data.length < windowSize) {
-        return@makeStringProvider data.static()
+        data.static()
     }
-    if (!enabled) {
-        return@makeStringProvider data.substring(0, min(windowSize, data.length)).static()
-    }
-    Log.i("Scrollable", "Data: $data");
-    {
-        Log.i("Scrollable", "coroutineScope: $coroutineScope")
-        ScrollingText(
-            data,
-            windowSize,
-            charsPerScroll,
-            scrollDuration,
-            scrollWaitAtStart,
-            scrollWaitAtEnd
-        ).stateIn(
-            coroutineScope,
-            SharingStarted.Lazily,
-            data.substring(0, min(windowSize, data.length))
-        )
+    else if (!enabled) {
+        data.substring(0, min(windowSize, data.length)).static()
+    } else {
+        Log.i("Scrollable", "Data: $data");
+        {
+            Log.i("Scrollable", "coroutineScope: $coroutineScope")
+            ScrollingText(
+                data,
+                windowSize,
+                charsPerScroll,
+                scrollDuration,
+                scrollWaitAtStart,
+                scrollWaitAtEnd
+            ).stateIn(
+                coroutineScope,
+                SharingStarted.Lazily,
+                data.substring(0, min(windowSize, data.length))
+            )
+        }
     }
 }
 
@@ -117,49 +99,37 @@ private fun ScrollingText(
     }
 }
 
-fun WidgetsApiContext.Text(
-    topText: StringProvider,
-    bottomText: StringProvider,
-) = makeWidget {
+fun CompositionContext<WidgetContent>.Text(
+    topText: Provider<String>,
+    bottomText: Provider<String>
+) = makeReactive<WidgetContent>{
     Log.i("Text", "Creating StaticContent")
-    @Suppress("NAME_SHADOWING")
     Log.i("Text", "Rendering topText")
+    @Suppress("NAME_SHADOWING")
     val topText by useState { topText.toState() }
     Log.i("Text", "TopText: $topText")
 
-    @Suppress("NAME_SHADOWING")
     Log.i("Text", "Rendering bottomText")
+    @Suppress("NAME_SHADOWING")
     val bottomText by useState { bottomText.toState() }
     Log.i("Text", "BottomText: $bottomText")
-
-    StaticContent(topText, bottomText)
+    WidgetContent(topText, bottomText).static()
 }
 
 // region alternative-text
-fun WidgetsApiContext.Text(
+fun CompositionContext<WidgetContent>.Text(
     topText: String,
-    bottomText: StringProvider
+    bottomText: CompositionContext<String>.() -> Flow<String>
 ) = Text(topText.static(), bottomText)
 
-fun WidgetsApiContext.Text(
-    topText: StringProvider,
+fun CompositionContext<WidgetContent>.Text(
+    topText: CompositionContext<String>.() -> Flow<String>,
     bottomText: String
 ) = Text(topText, bottomText.static())
 
-fun WidgetsApiContext.Text(
+fun CompositionContext<WidgetContent>.Text(
     topText: String,
     bottomText: String
 ) = Text(topText.static(), bottomText.static())
 // endregion
 
-
-fun WidgetsApiContext.StaticContent(
-    topText: String,
-    bottomText: String
-): WidgetProvider =
-    {
-        Log.i("StaticContent", "Creating WidgetContent")
-        Log.i("StaticContent", "TopText: $topText")
-        Log.i("StaticContent", "BottomText: $bottomText")
-        MutableStateFlow(WidgetContent(topText, bottomText))
-    }

@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import net.leloubil.fossilwidgets.inputs.Input
 import net.leloubil.fossilwidgets.widgets.WidgetContent
+import kotlin.reflect.KClass
 
 class DependencyTracker() {
     val dependentFlows = mutableMapOf<String, StateFlow<*>>()
@@ -46,7 +47,7 @@ class StateFlowDelegate<T>(
 }
 
 
-abstract class CompositionContext(val context: Context, val coroutineScope: CoroutineScope) {
+open class CompositionContext<TOut>(val context: Context, val coroutineScope: CoroutineScope) {
     private val tracker = DependencyTracker()
 
     //    fun <T> Flow<T>.asState(): StateFlowDelegate<T> {
@@ -66,11 +67,24 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
 
     fun <T> Input<T>.toState() = this.getInput(coroutineScope).toState()
 
+    fun <T> T.static(): Provider<T> = { MutableStateFlow(this@static) }
+    fun <T> Provider<T>.toState() =
+        this@toState(CompositionContext(context, coroutineScope)).toState()
+
     companion object {
-        fun <TContext : CompositionContext, TOut> makeComposer(
-            contextConstructor: (context: Context, coroutineScope: CoroutineScope) -> TContext
-        )
-                : ((action: TContext.() -> (TContext.() -> Flow<TOut>)) -> TContext.() -> Flow<TOut>) =
+        private val composers = mutableMapOf<KClass<*>, (ProviderCreator<*>) -> Provider<*>>()
+
+        inline fun <reified TOut> makeComposer() = makeComposerWrapper<TOut>(TOut::class)
+
+        @Suppress("UNCHECKED_CAST")
+        fun <TOut> makeComposerWrapper(kClass: KClass<*>): (ProviderCreator<TOut>) -> Provider<TOut> =
+            composers.getOrPut(kClass) {
+                makeComposerFunc<TOut>() as (ProviderCreator<*>) -> Provider<*>
+            } as (ProviderCreator<TOut>) -> Provider<TOut>
+
+
+        fun <TOut> makeComposerFunc()
+                : ((action: ProviderCreator<TOut>) -> Provider<TOut>) =
             { action ->
                 a@{
                     Log.i(
@@ -88,7 +102,7 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
                                 "makeComposer",
                                 "Creating first composition, new subscope ${this@channelFlow}"
                             )
-                            val receiver = contextConstructor(context, this@channelFlow)
+                            val receiver = CompositionContext<TOut>(context, this@channelFlow)
                             val dependencies = mutableSetOf<StateFlow<*>>()
                             assert(tracker.dependentFlows.isEmpty())
                             dependencies.clear()
@@ -139,7 +153,14 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
                                             val first =
                                                 dependencies.map { s ->
                                                     s.drop(1) // stateflow replays the last value on collection, so we drop it
-                                                        .map { sa -> sa.also { Log.i("StateObserver","Dependency changed: $sa") } }
+                                                        .map { sa ->
+                                                            sa.also {
+                                                                Log.i(
+                                                                    "StateObserver",
+                                                                    "Dependency changed: $sa"
+                                                                )
+                                                            }
+                                                        }
                                                 }.merge().first()
                                             Log.i(
                                                 "makeComposer",
@@ -154,7 +175,10 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
                                         oldComposition =
                                             receiver.coroutineScope.launch newComposition@{
                                                 val newReceiver =
-                                                    contextConstructor(context, this@newComposition)
+                                                    CompositionContext<TOut>(
+                                                        context,
+                                                        this@newComposition
+                                                    )
                                                 Log.i(
                                                     "makeComposer",
                                                     "Created new receiver, new subscope ${this@newComposition}"
@@ -171,9 +195,10 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
                                                 newReceiver.tracker.dependentFlows.clear()
                                                 var lastVal: TOut? = null
                                                 try {
-                                                    val newFlow = with(newReceiver) { // no dependentFlows here
-                                                        flowProvider()
-                                                    }
+                                                    val newFlow =
+                                                        with(newReceiver) { // no dependentFlows here
+                                                            flowProvider()
+                                                        }
                                                     newFlow.collectLatest {
                                                         Log.i(
                                                             "makeComposer",
@@ -238,91 +263,27 @@ abstract class CompositionContext(val context: Context, val coroutineScope: Coro
     }
 }
 
-
-// widgets
-class WidgetsApiContext(
-    context: Context,
-    coroutineScope: CoroutineScope
-) : CompositionContext(context, coroutineScope) {
-
-    fun StringProvider.toState() = this@toState(StringContext(context, coroutineScope)).toState()
-
-    fun String.static(): StringProvider = {
-        MutableStateFlow(this@static).also {
-            Log.i("WidgetsApiContext", "Created static string flow based on ${this@static}")
-        }
-    }
-
-    companion object {
-        val makeWidget2 by lazy {
-            makeComposer<WidgetsApiContext, WidgetContent>(::WidgetsApiContext)
-        }
-    }
-}
+typealias Provider<TOut> = CompositionContext<TOut>.() -> Flow<TOut>
+typealias ProviderCreator<TOut> = CompositionContext<TOut>.() -> Provider<TOut>
 
 
-typealias WidgetProvider = WidgetsApiContext.() -> Flow<WidgetContent>
-
-fun makeWidget(
-    action: WidgetsApiContext.() -> WidgetProvider
-): WidgetProvider =
-    WidgetsApiContext.makeWidget2(action)
-
-
-class StringContext(
-    context: Context,
-    coroutineScope: CoroutineScope
-) : CompositionContext(context, coroutineScope) {
-    companion object {
-        val makeString by lazy {
-            makeComposer<StringContext, String>(::StringContext)
-        }
-    }
-
-    fun String.static(): StringProvider = { MutableStateFlow(this@static) }
-    fun StringProvider.toState() = this@toState(StringContext(context, coroutineScope)).toState()
-}
-
-fun StaticString(string: String): StringProvider = { MutableStateFlow(string) }
-
-typealias StringProvider = StringContext.() -> Flow<String>
-typealias StringProviderCreator = StringContext.() -> StringProvider
-
-fun makeStringProvider(
-    action: StringContext.() -> StringProvider
-): StringProvider =
-    StringContext.makeString(action)
+inline fun <reified T> makeReactive(
+    noinline action: ProviderCreator<T>
+): CompositionContext<T>.() -> Flow<T> =
+    CompositionContext.makeComposer<T>()(action)
 
 
 data class WatchFace(
     val name: String,
-    val widgets: List<WidgetProvider>
+    val widgets: List<CompositionContext<WidgetContent>.() -> Flow<WidgetContent>>
 )
 
-// watchfaces
-class WatchFaceContext(
-    context: Context,
-    coroutineScope: CoroutineScope
-) : CompositionContext(context, coroutineScope) {
-    companion object {
-        val makeWatchface2 by lazy {
-            makeComposer<WatchFaceContext, WatchFace>(
-                ::WatchFaceContext
-            )
-        }
-    }
-
-    fun makeWatchFace(string: String, vararg widgets: WidgetProvider): WatchFaceProvider =
-        { MutableStateFlow(WatchFace(string, widgets.toList())) }
-}
-
-typealias WatchFaceProvider = WatchFaceContext.() -> Flow<WatchFace>
-
-fun makeWatchFaceProvider(
-    action: WatchFaceContext.() -> WatchFaceProvider
-): WatchFaceProvider =
-    WatchFaceContext.makeWatchface2(action)
-
+@Suppress("UnusedReceiverParameter")
+fun CompositionContext<WatchFace>.makeWatchFace(
+    string: String,
+    vararg widgets: Provider<WidgetContent>
+): CompositionContext<WatchFace>.() -> Flow<WatchFace> =
+    { MutableStateFlow(WatchFace(string, widgets.toList())) }
 
 fun <T, U> StateFlow<T>.stateMap(
     coroutineScope: CoroutineScope,
