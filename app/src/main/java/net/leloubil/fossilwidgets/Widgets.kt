@@ -1,19 +1,23 @@
-package net.leloubil.fossilwidgets.api
+package net.leloubil.fossilwidgets
 
-import android.util.Log
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.datetime.DateTimeUnit
-import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format
 import kotlinx.datetime.format.char
 import kotlinx.datetime.toLocalDateTime
+import net.leloubil.fossilwidgets.api.Scrollable
+import net.leloubil.fossilwidgets.api.Text
+import net.leloubil.fossilwidgets.api.WatchFaceContext
+import net.leloubil.fossilwidgets.api.WidgetsApiContext
+import net.leloubil.fossilwidgets.api.makeStringProvider
+import net.leloubil.fossilwidgets.api.makeWatchFaceProvider
+import net.leloubil.fossilwidgets.api.makeWidget
 import net.leloubil.fossilwidgets.inputs.TimedLatchInput
 import net.leloubil.fossilwidgets.stateproviders.MediaState
 import net.leloubil.fossilwidgets.stateproviders.getMediaStateFlow
+import net.leloubil.fossilwidgets.stateproviders.nextCalendarEventFlow
 import net.leloubil.fossilwidgets.stateproviders.timeEventFlow
-import net.leloubil.fossilwidgets.widgets.WidgetContent
 import kotlin.time.Duration.Companion.seconds
 
 
@@ -23,12 +27,17 @@ fun WatchFaceContext.SomeWidget() = makeWidget {
     val latchInput by useState { testLatch.toState() }
     if (mediaState.isPlaying) {
         Text(
-            PlayState(mediaState, latchInput),
-            "Playing ${mediaState.metadata?.artist}"
+            NextEvent(),
+            PlayState(mediaState, latchInput)
         )
     } else {
         NotPlaying()
     }
+}
+
+private fun WatchFaceContext.NextEvent() = makeStringProvider {
+    val nextEvent by useState { nextCalendarEventFlow(context, coroutineScope).toState() }
+    (nextEvent?.title ?: "No upcoming event").static()
 }
 
 private fun WidgetsApiContext.PlayState(mediaState: MediaState, scroll: Boolean) =

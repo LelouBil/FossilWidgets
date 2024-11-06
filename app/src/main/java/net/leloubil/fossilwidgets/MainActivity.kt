@@ -24,13 +24,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import net.leloubil.fossilwidgets.api.BaseWatchFace
 import net.leloubil.fossilwidgets.ui.theme.FossilWidgetsTheme
 import net.leloubil.fossilwidgets.widgets.FakeWidgetService
 import net.leloubil.fossilwidgets.widgets.WatchWidgetService
 import net.leloubil.fossilwidgets.widgets.WidgetsManager
 import net.leloubil.fossilwidgets.stateproviders.NotificationListener
+import net.leloubil.fossilwidgets.widgets.RealWidgetService
 
+const val USE_FAKE_WIDGET_SERVICE: Boolean = false
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 
 @Composable
@@ -102,7 +104,7 @@ fun App() {
 private fun Component(innerPadding: PaddingValues) {
     Column(modifier = Modifier.padding(innerPadding)) {
         val fakeWidgetService by remember { mutableStateOf(FakeWidgetService()) }
-        ButtonsList(widgetService = fakeWidgetService)
+        ButtonsList(widgetService = if (USE_FAKE_WIDGET_SERVICE) fakeWidgetService else RealWidgetService)
         Column {
             Text("watchface: ${fakeWidgetService.watchFace}")
             Text("Widget count: ${fakeWidgetService.state.size}")
