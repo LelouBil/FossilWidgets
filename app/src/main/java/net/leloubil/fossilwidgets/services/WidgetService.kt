@@ -8,15 +8,18 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
+import net.leloubil.fossilwidgets.api.WatchFaceContext
+import net.leloubil.fossilwidgets.api.WidgetsApiContext
 import net.leloubil.fossilwidgets.inputs.MenuInputReceiver
 import net.leloubil.fossilwidgets.widgets.WidgetContent
 import net.leloubil.fossilwidgets.widgets.WidgetsManager
-import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
 
 class WidgetService : LifecycleService() {
 
@@ -27,29 +30,52 @@ class WidgetService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        ContextCompat.registerReceiver(this,MenuInputReceiver, IntentFilter("nodomain.freeyourgadget.gadgetbridge.Q_COMMUTE_MENU"),
-            ContextCompat.RECEIVER_EXPORTED)
+        ContextCompat.registerReceiver(
+            this,
+            MenuInputReceiver,
+            IntentFilter("nodomain.freeyourgadget.gadgetbridge.Q_COMMUTE_MENU"),
+            ContextCompat.RECEIVER_EXPORTED
+        )
         Log.i("FossilWidgets", "Starting service onStart")
-        lifecycleScope.launch {
+        lifecycleScope.launch watchFace@{
             Toast.makeText(this@WidgetService, "Widget Service started", Toast.LENGTH_LONG).show()
+            Log.i("FossilWidgets", "Starting service, lifecycle: ${this@watchFace}")
             try {
-                WidgetsManager.watchface?.let {
-                    it(
-                        WidgetComposeState(
-                            this@launch,
-                            this@WidgetService
-                        )
+                WidgetsManager.watchFaceProvider(
+                    WatchFaceContext(
+                        this@WidgetService,
+                        this@watchFace
                     )
-                }
-                    ?.collectLatest { watchFace ->
-                        Log.i("FossilWidgets", "New watchface: $watchFace")
-                        WidgetsManager.widgetService.setWatchFace(this@WidgetService, watchFace.name)
-                        supervisorScope {
+                )
+                    .distinctUntilChangedBy { it.name } // don't reset widgets if watchface didn't change
+                    .collectLatest { watchFace ->
+                        WidgetsManager.widgetService.setWatchFace(
+                            this@WidgetService,
+                            watchFace.name
+                        )
+//                        supervisorScope { // if a widget crashes, don't crash the whole service
+                            Log.i(
+                                "FossilWidgets",
+                                "Starting widgets, supervisor status: ${this.isActive}, supervisor: ${this}"
+                            )
                             watchFace.widgets.forEachIndexed { index, widgetContentProvider ->
-                                launch {
+                                launch widget@{
+                                    Log.i(
+                                        "FossilWidgets",
+                                        "Starting widget $index, scope status: ${this@widget.isActive}, scope: ${this@widget}"
+                                    )
                                     var oldContent: WidgetContent? = null
-                                    widgetContentProvider.collectLatest {
-                                        coroutineScope {
+                                    widgetContentProvider(
+                                        WidgetsApiContext(
+                                            this@WidgetService,
+                                            this@widget
+                                        )
+                                    )
+                                        .collectLatest {
+                                            Log.i(
+                                                "FossilWidgets",
+                                                "New content for widget $index: $it"
+                                            )
                                             if (oldContent != it) {
                                                 oldContent = it
                                                 WidgetsManager.widgetService.setWidget(
@@ -60,11 +86,16 @@ class WidgetService : LifecycleService() {
                                                 )
                                             }
                                         }
-                                    }
+                                    Log.i("FossilWidgets", "Widget $index finished")
                                 }
                             }
-                        }
-                    }
+                            Log.i("FossilWidgets", "All widgets started, waiting for cancellation")
+                            awaitCancellation()
+                        } //todo error handling (logging and restarting the widget)
+                        Log.i("FossilWidgets", "All widgets finished")
+//                    }
+                Log.i("FossilWidgets", "Watchface finished")
+                awaitCancellation()
             } catch (e: CancellationException) {
                 Log.i("FossilWidgets", "Service cancelled")
             } catch (e: Exception) {

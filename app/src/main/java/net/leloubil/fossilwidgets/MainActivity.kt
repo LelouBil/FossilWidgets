@@ -16,24 +16,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import net.leloubil.fossilwidgets.composewidget.BaseWatchFace
+import net.leloubil.fossilwidgets.api.BaseWatchFace
 import net.leloubil.fossilwidgets.ui.theme.FossilWidgetsTheme
 import net.leloubil.fossilwidgets.widgets.FakeWidgetService
 import net.leloubil.fossilwidgets.widgets.WatchWidgetService
 import net.leloubil.fossilwidgets.widgets.WidgetsManager
 import net.leloubil.fossilwidgets.stateproviders.NotificationListener
-import net.leloubil.fossilwidgets.widgets.RealWidgetService
-import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,7 +80,7 @@ fun ButtonsList(modifier: Modifier = Modifier, widgetService: WatchWidgetService
             modifier = Modifier.align(Alignment.CenterHorizontally),
             onClick = {
                 Log.i("FossilWidgets", "Set widget count")
-                WidgetsManager.setWatchface(WidgetComposeState::BaseWatchFace, context)
+                WidgetsManager.setWatchface(BaseWatchFace(), context)
             }) {
             Text("Reset all")
         }
@@ -106,7 +102,7 @@ fun App() {
 private fun Component(innerPadding: PaddingValues) {
     Column(modifier = Modifier.padding(innerPadding)) {
         val fakeWidgetService by remember { mutableStateOf(FakeWidgetService()) }
-        ButtonsList(widgetService = RealWidgetService)
+        ButtonsList(widgetService = fakeWidgetService)
         Column {
             Text("watchface: ${fakeWidgetService.watchFace}")
             Text("Widget count: ${fakeWidgetService.state.size}")

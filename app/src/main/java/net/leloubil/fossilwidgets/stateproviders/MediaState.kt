@@ -8,14 +8,14 @@ import android.media.session.PlaybackState
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.channelFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.stateIn
-import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
+import net.leloubil.fossilwidgets.api.stateFlatMap
+import net.leloubil.fossilwidgets.api.stateMap
 
 sealed class MediaInfoUpdate {
     data class MetadataChanged(val mediaInfo: MediaMetadata?) : MediaInfoUpdate()
@@ -58,6 +58,7 @@ fun mediaSessionFlowCallback(
     }
     mediaSession.registerCallback(callback)
     awaitClose {
+        Log.i("MediaControllerStateFlow", "Removing callback")
         mediaSession.unregisterCallback(callback)
     }
 }
@@ -66,10 +67,12 @@ fun mediaSessionStateFlow(
     mediaSession: MediaController,
     coroutineScope: CoroutineScope
 ): StateFlow<MediaState> {
+    Log.i("MediaState", "Creating mediaSessionStateFlow")
     var mediaState = MediaState(
         mediaSession.metadata.convert(),
         mediaSession.playbackState?.state == PlaybackState.STATE_PLAYING
     )
+    Log.i("MediaState", "Initial mediaState: $mediaState")
     return flow {
         mediaSessionFlowCallback(mediaSession).collect {
             mediaState = when (it) {
@@ -83,7 +86,7 @@ fun mediaSessionStateFlow(
             }
             emit(mediaState)
         }
-    }.stateIn(coroutineScope, SharingStarted.Eagerly, mediaState)
+    }.stateIn(coroutineScope, SharingStarted.Lazily, mediaState)
 }
 
 fun mediaSessionCallbackFlow(context: Context) = callbackFlow {
@@ -95,6 +98,7 @@ fun mediaSessionCallbackFlow(context: Context) = callbackFlow {
     }
     mediaSessionManager.addOnActiveSessionsChangedListener(listener, listenerComponent)
     awaitClose {
+        Log.i("MediaSessionCallbackFlow", "Removing listener")
         mediaSessionManager.removeOnActiveSessionsChangedListener(listener)
     }
 }
@@ -107,25 +111,29 @@ private fun mediaSessionManager(context: Context): Pair<ComponentName, MediaSess
     return Pair(listenerComponent, mediaSessionManager)
 }
 
-fun mediaSessionStateFlow(
+fun mediaControllerStateFlow(
     context: Context,
     coroutineScope: CoroutineScope
 ): StateFlow<MediaController?> {
+    Log.i("MediaState", "Creating mediaControllerStateFlow")
     val (listener, currentMediaSession) = mediaSessionManager(context)
     return mediaSessionCallbackFlow(context).stateIn(
-        coroutineScope, SharingStarted.Eagerly,
+        coroutineScope, SharingStarted.Lazily,
         currentMediaSession.getActiveSessions(listener).firstOrNull()
     )
 }
 
-suspend fun WidgetComposeState.getMediaStateFlow(): StateFlow<MediaState> = channelFlow {
-    mediaSessionStateFlow(context, coroutineScope).collectLatest { it ->
+
+fun getMediaStateFlow(context: Context, coroutineScope: CoroutineScope): StateFlow<MediaState> =
+    mediaControllerStateFlow(context, coroutineScope).stateFlatMap(coroutineScope, {
         if (it == null) {
-            send(MediaState(null, false))
+            MutableStateFlow(MediaState(null, false))
         } else {
-            mediaSessionStateFlow(it, coroutineScope).collectLatest { state ->
-                send(state)
-            }
+            mediaSessionStateFlow(it, coroutineScope)
         }
     }
-}.stateIn(coroutineScope)
+    ).stateMap(coroutineScope, {
+        it.also {
+            Log.i("MediaState", "MediaState updated: $it")
+        }
+    })

@@ -4,19 +4,22 @@ import android.database.Cursor
 import android.provider.CalendarContract
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
-import net.leloubil.fossilwidgets.widgetsapi.widgetDataProvider
+import kotlinx.datetime.Instant
+import net.leloubil.fossilwidgets.api.CompositionContext
 import net.leloubil.fossilwidgets.widgets.WidgetContent
-import net.leloubil.fossilwidgets.widgetsapi.WidgetComposeState
-import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
 //
 data class CalendarEvent(val title: String, val start: Instant, val end: Instant)
 
-suspend fun WidgetComposeState.nextCalendarEventFlow(
+suspend fun CompositionContext.nextCalendarEventFlow(
     updateTime: Duration = 10.minutes
-) = widgetDataProvider {
+) = channelFlow {
     while (currentCoroutineContext().isActive) {
         // get next calendar event that is not all day
         val cursor: Cursor? = context.contentResolver.query(
@@ -38,11 +41,17 @@ suspend fun WidgetComposeState.nextCalendarEventFlow(
                     cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.DTSTART))
                 val end: String =
                     cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.DTEND))
-                emit(WidgetContent(title, "Start: $start End: $end"))
+                send(
+                    CalendarEvent(
+                        title,
+                        Instant.fromEpochMilliseconds(start.toLong()),
+                        Instant.fromEpochMilliseconds(end.toLong())
+                    )
+                )
             }
             cursor.close()
         }
         delay(updateTime)
     }
-}
+}.stateIn(coroutineScope)
 
