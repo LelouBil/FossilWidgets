@@ -1,5 +1,6 @@
 package net.leloubil.fossilwidgets
 
+import android.util.Log
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DatePeriod
 import kotlinx.datetime.DateTimeUnit
@@ -53,6 +54,17 @@ fun formatTime(time: Instant) = time.toLocalDateTime(TimeZone.currentSystemDefau
     }
 )
 
+fun formatTimeWithDifference(time: Instant, relativeTo: Instant): String {
+    val startDiff = relativeTo.periodUntil(time,TimeZone.currentSystemDefault())
+    Log.i("format","start diff: $startDiff")
+    val nextIn = if(startDiff.hours == 0) {
+        "${startDiff.minutes}m"
+    } else{
+        "${startDiff.hours}h"
+    }
+    return formatTime(time) + " ($nextIn)"
+}
+
 private fun CompositionContext<WidgetContent>.NextEvent() =
     makeReactive<WidgetContent> {
         val nextEvent by useState { nextCalendarEventFlow(context, coroutineScope).toState() }
@@ -97,11 +109,11 @@ private fun formatEventBottom(
                 "Demain"
             }
         } else {
-            formatTime(event.start)
+           formatTimeWithDifference(event.start,now)
         }
     } else {
         // during
-        "-> " + formatTime(event.end)
+        "-> " + formatTimeWithDifference(event.end,now)
     }
 }
 

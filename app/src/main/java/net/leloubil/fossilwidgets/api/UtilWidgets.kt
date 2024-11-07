@@ -17,10 +17,10 @@ import kotlin.time.Duration.Companion.seconds
 fun CompositionContext<WidgetContent>.Scrollable(
     enabled: Boolean = true,
     windowSize: Int = 14,
-    charsPerScroll: Int = 8,
+    charsPerScroll: Int = 10,
     scrollDuration: Duration = 3.seconds,
-    scrollWaitAtStart: Duration = 2.seconds,
-    scrollWaitAtEnd: Duration = 3.seconds,
+    scrollWaitAtStart: Duration = 1.seconds,
+    scrollWaitAtEnd: Duration = 4.seconds,
     it: ProviderCreator<String>
 ) =
     Scrollable(
@@ -37,10 +37,10 @@ private fun Scrollable(
     sourceProviderState: Provider<String>,
     enabled: Boolean = true,
     windowSize: Int = 14,
-    charsPerScroll: Int = 8,
-    scrollDuration: Duration = 3.seconds,
-    scrollWaitAtStart: Duration = 3.seconds,
-    scrollWaitAtEnd: Duration = 3.seconds
+    charsPerScroll: Int = 10,
+    scrollDuration: Duration = 4.seconds,
+    scrollWaitAtStart: Duration = 1.seconds,
+    scrollWaitAtEnd: Duration = 6.seconds
 ) = makeReactive<String>{
     Log.i("Scrollable", "Creating ScrollingText")
     val data by useState { sourceProviderState.toState() }
@@ -87,9 +87,6 @@ private fun ScrollingText(
             if (text.length > windowSize) {
                 topScroll += charsPerScroll
             }
-        } else if (topScroll + windowSize >= text.length) {
-            delay(scrollWaitAtEnd)
-            topScroll = 0
         } else {
             delay(scrollDuration)
             topScroll += charsPerScroll
@@ -99,6 +96,10 @@ private fun ScrollingText(
         val dots = if (upper < text.length) "…" else ""
         Log.i("ScrollingText", "Emitting text: ${text.substring(lower, upper)}$dots")
         emit(text.substring(lower, upper) + dots)
+        if (topScroll + windowSize >= text.length) {
+            delay(scrollWaitAtEnd)
+            topScroll = 0
+        }
     }
 }
 
