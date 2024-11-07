@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.seconds
 
 fun CompositionContext<WidgetContent>.Scrollable(
     enabled: Boolean = true,
-    windowSize: Int = 20,
+    windowSize: Int = 14,
     charsPerScroll: Int = 8,
     scrollDuration: Duration = 3.seconds,
     scrollWaitAtStart: Duration = 2.seconds,
@@ -36,7 +36,7 @@ fun CompositionContext<WidgetContent>.Scrollable(
 private fun Scrollable(
     sourceProviderState: Provider<String>,
     enabled: Boolean = true,
-    windowSize: Int = 20,
+    windowSize: Int = 14,
     charsPerScroll: Int = 8,
     scrollDuration: Duration = 3.seconds,
     scrollWaitAtStart: Duration = 3.seconds,
@@ -48,7 +48,9 @@ private fun Scrollable(
         data.static()
     }
     else if (!enabled) {
-        data.substring(0, min(windowSize, data.length)).static()
+        data.substring(0, min(windowSize, data.length)).let {
+            if(data.length > windowSize) "$it…" else it
+        }.static()
     } else {
         Log.i("Scrollable", "Data: $data");
         {
@@ -94,8 +96,9 @@ private fun ScrollingText(
         }
         val lower = min(topScroll, text.length)
         val upper = min(topScroll + windowSize, text.length)
-        Log.i("ScrollingText", "Emitting text: ${text.substring(lower, upper)}")
-        emit(text.substring(lower, upper))
+        val dots = if (upper < text.length) "…" else ""
+        Log.i("ScrollingText", "Emitting text: ${text.substring(lower, upper)}$dots")
+        emit(text.substring(lower, upper) + dots)
     }
 }
 

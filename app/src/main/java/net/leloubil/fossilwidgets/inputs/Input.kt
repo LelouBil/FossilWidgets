@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 
-class BooleanInput(name: String, defaultValue: Boolean) : Input<Boolean>(name,defaultValue) {
+class BooleanInput(name: String, defaultValue: Boolean) : Input<Boolean>(name, defaultValue) {
     override suspend fun onReceive(data: Flow<String>): Flow<Boolean> =
         data.map { it.toBoolean() }
 }
@@ -34,7 +34,7 @@ class TimedLatchInput<T>(
     private val resetDelay: Duration,
     private val defaultValue: T,
     private val conversionFunc: (String) -> T
-) : Input<T>(name,defaultValue) {
+) : Input<T>(name, defaultValue) {
     override suspend fun onReceive(data: Flow<String>): Flow<T> =
         channelFlow {
             var lastValue: T
@@ -62,7 +62,8 @@ abstract class Input<T>(private val name: String, private val defaultValue: T) {
 
     fun getInput(coroutineScope: CoroutineScope): StateFlow<T> = callbackFlow {
         val listener = Channel<String>()
-        MenuInputReceiver.listeners[name] = listener
+        val ls = MenuInputReceiver.listeners.getOrPut(name) { mutableListOf() }
+        ls.add(listener)
         Log.i("Input", "Listening for $name")
         onReceive(listener.receiveAsFlow()).collectLatest {
             Log.i("Input", "Sending value $it")
@@ -72,7 +73,7 @@ abstract class Input<T>(private val name: String, private val defaultValue: T) {
         Log.i("Input", "waiting for close")
         awaitClose {
             Log.i("Input", "Closing input")
-            MenuInputReceiver.listeners.remove(name)
+            MenuInputReceiver.listeners[name]?.remove(listener)
         }
     }.stateIn(coroutineScope, SharingStarted.Eagerly, defaultValue)
 
@@ -82,16 +83,19 @@ abstract class Input<T>(private val name: String, private val defaultValue: T) {
 
 
 object MenuInputReceiver : BroadcastReceiver() {
-    val listeners: HashMap<String, SendChannel<String>> = HashMap()
+    val listeners: HashMap<String, MutableList<SendChannel<String>>> = HashMap()
     override fun onReceive(context: Context, intent: Intent) {
         Log.i("MenuInputReceiver", "Received intent $intent")
         intent.getStringExtra("EXTRA_ACTION")?.let { action ->
             Log.i("MenuInputReceiver", "Received action: $action")
-            val (target, value) = action.split(":", limit = 2)
-            Log.i("MenuInputReceiver", "Target: $target, value: $value")
-            listeners[target]?.let { listener ->
-                Log.i("MenuInputReceiver", "Sending value $value to $target")
-                listener.trySend(value)
+            val (targets, value) = action.split(":", limit = 2)
+            val allTargets = targets.split(",")
+            Log.i("MenuInputReceiver", "Targets: $targets, value: $value")
+            allTargets.forEach { target ->
+                listeners[target]?.let { listener ->
+                    Log.i("MenuInputReceiver", "Sending value $value to $target")
+                    listener.forEach { it.trySend(value) }
+                }
             }
         }
     }

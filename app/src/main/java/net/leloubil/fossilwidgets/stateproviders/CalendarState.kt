@@ -17,7 +17,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 //
-data class CalendarEvent(val title: String, val start: Instant, val end: Instant)
+data class CalendarEvent(val title: String, val start: Instant, val end: Instant, val location: String? = null)
 
 
 private fun getNextEvent(context: Context): CalendarEvent? {
@@ -26,7 +26,8 @@ private fun getNextEvent(context: Context): CalendarEvent? {
         arrayOf(
             CalendarContract.Events.TITLE,
             CalendarContract.Events.DTSTART,
-            CalendarContract.Events.DTEND
+            CalendarContract.Events.DTEND,
+            CalendarContract.Events.EVENT_LOCATION
         ),
         "${CalendarContract.Events.ALL_DAY} = 0 AND (${CalendarContract.Events.DTSTART} >= ${System.currentTimeMillis()} OR ${CalendarContract.Events.DTEND} >= ${System.currentTimeMillis()})",
         null,
@@ -40,10 +41,12 @@ private fun getNextEvent(context: Context): CalendarEvent? {
             cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.DTSTART))
         val end: String =
             cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.DTEND))
+        val location: String? = cursor.getString(cursor.getColumnIndexOrThrow(CalendarContract.Events.EVENT_LOCATION))
         CalendarEvent(
             title,
             Instant.fromEpochMilliseconds(start.toLong()),
-            Instant.fromEpochMilliseconds(end.toLong())
+            Instant.fromEpochMilliseconds(end.toLong()),
+            location
         )
     } else {
         null

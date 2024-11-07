@@ -31,7 +31,7 @@ import net.leloubil.fossilwidgets.widgets.WidgetsManager
 import net.leloubil.fossilwidgets.stateproviders.NotificationListener
 import net.leloubil.fossilwidgets.widgets.RealWidgetService
 
-const val USE_FAKE_WIDGET_SERVICE: Boolean = true
+const val USE_FAKE_WIDGET_SERVICE: Boolean = false
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
